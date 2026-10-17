@@ -6,6 +6,8 @@ import { JobSheet } from './JobSheet'
 import { Board, Customers, Messages, SettingsPage } from './pages'
 import { connect, dismissNotice, useStore } from './store'
 import { supabase, useSession } from './supabase'
+import { InstallBanner } from './Install'
+import { useOnline } from './pwa'
 import { Icon, Sheet } from './ui'
 
 type Tab = 'board' | 'customers' | 'messages' | 'settings'
@@ -33,8 +35,14 @@ export default function App() {
 function Shell() {
   const [tab, setTab] = useState<Tab>('board')
   const [jobId, setJobId] = useState<string | null>(null)
-  const [intake, setIntake] = useState(false)
+  const [intake, setIntake] = useState(() => new URLSearchParams(location.search).has('new'))
   const { settings, notice } = useStore()
+  const online = useOnline()
+
+  // Opened from the "New check-in" home-screen shortcut (/?new=1): clean the address bar.
+  useEffect(() => {
+    if (location.search) history.replaceState(null, '', location.pathname)
+  }, [])
 
   const sheet = intake ? 'intake' : jobId ? 'job' : null
 
@@ -57,6 +65,8 @@ function Shell() {
         </nav>
 
         <main>
+          {!online && <p className="offline" role="status">You’re offline. Changes can’t be saved until you reconnect.</p>}
+          <InstallBanner />
           {tab === 'board' && <Board onOpen={setJobId} />}
           {tab === 'customers' && <Customers onOpen={setJobId} />}
           {tab === 'messages' && <Messages />}
@@ -70,7 +80,9 @@ function Shell() {
           </div>
         )}
 
-        <button className="fab" onClick={() => setIntake(true)} aria-label="New check-in"><Icon name="plus" /></button>
+        {(tab === 'board' || tab === 'customers') && (
+          <button className="fab" onClick={() => setIntake(true)} aria-label="New check-in"><Icon name="plus" /></button>
+        )}
 
         <Sheet
           open={sheet !== null}

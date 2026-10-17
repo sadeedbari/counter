@@ -3,6 +3,7 @@ import { useMemo, useState } from 'react'
 import { VARIABLES, render } from './notify'
 import { addEmployee, removeEmployee, resetDemo, setStatus, updateSettings, useStore } from './store'
 import { supabase } from './supabase'
+import { InstallCard } from './Install'
 import { Workflow } from './Workflow'
 import type { Job } from './types'
 import { Avatar, Icon, StatusPill, exact, phaseColor, useWide, when } from './ui'
@@ -252,6 +253,7 @@ export function SettingsPage() {
     <>
       <PageHead title="Settings" sub={s.storeName} />
       <div className="settings">
+        <InstallCard />
         <section className="card">
           <h3>Store</h3>
           <label className="field"><span>Store name</span>

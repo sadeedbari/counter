@@ -44,17 +44,19 @@
 }
 
 * { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
 html, body, #root { min-height: 100%; }
-body { margin: 0; background: var(--bg); color: var(--text); }
+body { margin: 0; background: var(--bg); color: var(--text); -webkit-tap-highlight-color: transparent; overscroll-behavior-y: none; }
+button, a, select, summary, [role='button'], input[type='checkbox'] { touch-action: manipulation; }
 h1, h2, h3, p { margin: 0; }
 button, input, select, textarea { font: inherit; color: inherit; }
 button { cursor: pointer; border: 0; background: none; }
 :focus-visible { outline: 3px solid color-mix(in srgb, var(--accent) 55%, transparent); outline-offset: 2px; }
 
 /* ── shell ── */
-.app { display: grid; grid-template-columns: 240px 1fr; min-height: 100vh; }
+.app { display: grid; grid-template-columns: 240px 1fr; min-height: 100vh; min-height: 100dvh; }
 .nav {
-  position: sticky; top: 0; height: 100vh; padding: 20px 14px; display: flex; flex-direction: column; gap: 4px;
+  position: sticky; top: 0; height: 100vh; height: 100dvh; padding: 20px 14px; display: flex; flex-direction: column; gap: 4px;
   background: var(--glass); backdrop-filter: blur(24px) saturate(180%); border-right: 1px solid var(--line);
 }
 .brand { display: flex; align-items: center; gap: 10px; padding: 4px 10px 22px; letter-spacing: -0.01em; }
@@ -253,7 +255,7 @@ textarea { resize: vertical; }
 }
 
 /* ── auth, toast, delivery ── */
-.auth { min-height: 100vh; display: grid; place-items: center; padding: 24px; }
+.auth { min-height: 100vh; min-height: 100dvh; display: grid; place-items: center; padding: 24px; }
 .auth-card { width: min(400px, 100%); display: grid; gap: 16px; background: var(--surface); padding: 32px; border-radius: 28px; box-shadow: var(--shadow); }
 .auth-card h1 { font-size: 1.9rem; letter-spacing: -0.03em; line-height: 1.1; }
 .auth-card > p { color: var(--muted); margin-top: -8px; }
@@ -299,10 +301,74 @@ textarea { resize: vertical; }
 .warn { font-size: 0.88rem; padding: 10px 14px; border-radius: 12px; background: color-mix(in srgb, var(--s-in_progress) 14%, var(--surface)); }
 .save-bar { position: sticky; bottom: 16px; display: flex; justify-content: flex-end; align-items: center; gap: 16px; padding: 10px 12px; border-radius: 18px; background: var(--glass); backdrop-filter: blur(24px) saturate(180%); border: 1px solid var(--line); box-shadow: var(--shadow-lg); }
 @media (max-width: 899px) {
-  .phase-row { grid-template-columns: auto minmax(0, 1fr) auto; }
-  .phase-row select { grid-column: 2; grid-row: 2; }
-  .phase-row .row-actions { grid-column: 3; grid-row: 1 / span 2; flex-direction: column; }
+  .phase-row { grid-template-columns: auto minmax(0, 1fr) auto; row-gap: 8px; }
+  .phase-row .phase-name { grid-column: 2 / span 2; }
+  .phase-row select { grid-column: 1 / span 2; grid-row: 2; }
+  .phase-row .row-actions { grid-column: 3; grid-row: 2; justify-content: flex-end; }
 }
 
-.cust-main .cust-visit { font-size: 0.8rem; margin-top: 1px; }
-.cust-since { color: var(--muted); font-size: 0.82rem; padding: 4px 0 8px; }
+/* ── install + offline ── */
+.install-banner { display: flex; align-items: center; gap: 12px; background: var(--surface); border-radius: var(--r); box-shadow: var(--shadow); padding: 12px 14px; margin-bottom: 16px; }
+.install-banner > div { flex: 1; min-width: 0; }
+.install-banner p { color: var(--muted); font-size: 0.85rem; }
+.install-banner .btn { padding: 8px 16px; }
+.steps { margin: 0; padding-left: 20px; display: grid; gap: 6px; color: var(--muted); }
+.steps b { color: var(--text); font-weight: 600; }
+.offline { background: color-mix(in srgb, var(--danger) 12%, var(--surface)); color: var(--text); border-radius: 12px; padding: 10px 14px; margin-bottom: 16px; font-size: 0.9rem; }
+
+/* ── touch devices ── */
+@media (pointer: coarse) {
+  .icon-btn { width: 44px; height: 44px; }
+  .btn, .chip, .select-pill, .search { min-height: 44px; }
+  .chip, .search { height: 44px; }
+  .select-pill, select { height: 44px; }
+  .advance { padding: 12px; }
+  .link { padding: 12px 0; }
+  .cust-row { padding-block: 16px; }
+  .segmented button { min-height: 44px; }
+  .switch { transform: scale(1.05); transform-origin: right center; }
+}
+
+/* ── phone and small tablet ── */
+@media (max-width: 899px) {
+  /* 16px stops iOS Safari zooming the page when a field is focused. */
+  input, select, textarea, .search input { font-size: 16px; }
+  main {
+    padding-top: calc(24px + env(safe-area-inset-top));
+    padding-left: max(16px, env(safe-area-inset-left));
+    padding-right: max(16px, env(safe-area-inset-right));
+    padding-bottom: calc(150px + env(safe-area-inset-bottom));
+  }
+  .nav { padding-left: max(8px, env(safe-area-inset-left)); padding-right: max(8px, env(safe-area-inset-right)); }
+  .fab { right: max(16px, env(safe-area-inset-right)); }
+  .page-head { align-items: stretch; }
+  .tools { width: 100%; }
+  .tools .search { flex: 1 1 100%; min-width: 0; }
+  .tools .select-pill, .tools .chip { flex: 0 0 auto; }
+  .sheet-head { padding: 12px 20px 8px; }
+  .stack { padding: 8px 20px 20px; }
+  .sheet-foot { padding: 12px 20px calc(16px + env(safe-area-inset-bottom)); }
+  .card { padding: 16px; }
+  .msg { flex-wrap: wrap; }
+  .msg time { width: 100%; padding-left: 50px; }
+  .cust-jobs { padding-left: 18px; }
+  .cust-row { padding-inline: 14px; gap: 12px; }
+  .cust-row .count { display: none; }
+  .install-banner { padding: 10px 12px; }
+  .toast { left: 16px; right: 16px; transform: none; max-width: none; }
+  .save-bar { bottom: calc(84px + env(safe-area-inset-bottom)); }
+  .panel, .sheet { overscroll-behavior: contain; }
+}
+
+/* Short landscape phones: keep the sheet reachable. */
+@media (max-height: 480px) and (max-width: 899px) {
+  .sheet { max-height: 100dvh; border-radius: 0; }
+  .fab { bottom: calc(68px + env(safe-area-inset-bottom)); width: 48px; height: 48px; }
+}
+
+@media (pointer: coarse) {
+  .phase-tabs button { height: 44px; }
+  .swatch { width: 34px; height: 34px; }
+  .swatch-pop { grid-template-columns: repeat(5, 34px); top: 42px; }
+  .row-actions { gap: 2px; }
+}

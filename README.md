@@ -22,3 +22,14 @@ With no env vars the app runs in demo mode (data in the browser, messages logged
 - Edge Function secrets: `RESEND_API_KEY`, `RESEND_FROM`, `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`,
   and `TWILIO_FROM` (or `TWILIO_MESSAGING_SERVICE_SID`). Until set, messages show as Failed ("not configured").
 - Job photos: private Storage bucket `job-photos`, one folder per store.
+
+## Install as an app (PWA)
+
+Counter is an installable web app (manifest, icons, service worker in `public/`). It needs to be served
+over HTTPS (localhost also works) for the browser to offer "Install". The service worker only registers in
+production builds (`npm run build`). It caches the app shell so Counter opens offline; the database, auth,
+photos and message sending always go to the network, so changes can't be saved offline.
+
+- Chrome / Edge / Android: Install button in Settings (or the browser's install icon).
+- iPhone / iPad: Safari → Share → Add to Home Screen (Settings shows the steps).
+- Home-screen shortcut "New check-in" opens `/?new=1`.
