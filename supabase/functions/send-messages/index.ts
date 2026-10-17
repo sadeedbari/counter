@@ -1,7 +1,7 @@
 // Sends one queued message through Resend (email) or Twilio (SMS).
-// Called by the database trigger `messages_dispatch` with { id }. Deployed with verify_jwt = false:
-// it accepts nothing but a message id and only sends rows that are still 'queued', so a stray call
-// cannot send anything that was not legitimately queued by a status change or a Resend click.
+// Called by the database trigger `messages_dispatch` with { id }, authenticated with the project's
+// publishable key (Verify JWT stays on). It accepts nothing but a message id and only sends rows that
+// are still 'queued', so a stray call cannot send anything that was not legitimately queued.
 //
 // Secrets (Edge Functions > Secrets):
 //   RESEND_API_KEY, RESEND_FROM            e.g. notifications@yourdomain.com (verified in Resend)
@@ -20,6 +20,17 @@ function toE164(raw: string): string | null {
   return null
 }
 
+const clean = (v: string) => v.trim().replace(/^["']|["']$/g, '').trim()
+
+/** Accepts "notifications@domain.com" or "Name <notifications@domain.com>" in RESEND_FROM. */
+function fromAddress(storeName: string): string {
+  const raw = clean(env('RESEND_FROM'))
+  if (raw.includes('<')) return raw
+  if (!/^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/.test(raw))
+    throw new Error('RESEND_FROM must be an email address on a domain verified in Resend')
+  return `${storeName.replace(/[<>"]/g, '')} <${raw}>`
+}
+
 async function sendEmail(to: string, subject: string, body: string, storeName: string) {
   if (!env('RESEND_API_KEY') || !env('RESEND_FROM')) throw new Error('Resend is not configured')
   const html = `<div style="font:16px/1.5 -apple-system,Segoe UI,sans-serif;color:#1d1d1f;max-width:520px">
@@ -28,26 +39,46 @@ async function sendEmail(to: string, subject: string, body: string, storeName: s
     <p style="color:#6e6e73;font-size:13px;margin:0">${escapeHtml(storeName)}</p></div>`
   const r = await fetch('https://api.resend.com/emails', {
     method: 'POST',
-    headers: { Authorization: `Bearer ${env('RESEND_API_KEY')}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ from: `${storeName} <${env('RESEND_FROM')}>`, to, subject, text: body, html }),
+    headers: { Authorization: `Bearer ${clean(env('RESEND_API_KEY'))}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ from: fromAddress(storeName), to, subject, text: body, html }),
   })
   const j = await r.json().catch(() => ({}))
   if (!r.ok) throw new Error(j.message ?? `Resend ${r.status}`)
   return j.id as string
 }
 
+const twilioAuth = () => `Basic ${btoa(`${clean(env('TWILIO_ACCOUNT_SID'))}:${clean(env('TWILIO_AUTH_TOKEN'))}`)}`
+
+/** TWILIO_FROM may be a number (+1416…), a phone number ID (PN…) or a messaging service ID (MG…). */
+async function twilioSender(): Promise<{ key: 'From' | 'MessagingServiceSid'; value: string }> {
+  const svc = clean(env('TWILIO_MESSAGING_SERVICE_SID'))
+  if (svc) return { key: 'MessagingServiceSid', value: svc }
+  const from = clean(env('TWILIO_FROM'))
+  if (from.startsWith('MG')) return { key: 'MessagingServiceSid', value: from }
+  if (from.startsWith('PN')) {
+    const r = await fetch(
+      `https://api.twilio.com/2010-04-01/Accounts/${clean(env('TWILIO_ACCOUNT_SID'))}/IncomingPhoneNumbers/${from}.json`,
+      { headers: { Authorization: twilioAuth() } },
+    )
+    const j = await r.json().catch(() => ({}))
+    if (!r.ok || !j.phone_number) throw new Error(j.message ?? `Could not look up Twilio number ${from}`)
+    return { key: 'From', value: j.phone_number as string }
+  }
+  return { key: 'From', value: from }
+}
+
 async function sendSms(to: string, body: string) {
-  const sid = env('TWILIO_ACCOUNT_SID'), token = env('TWILIO_AUTH_TOKEN')
-  const from = env('TWILIO_FROM'), svc = env('TWILIO_MESSAGING_SERVICE_SID')
-  if (!sid || !token || (!from && !svc)) throw new Error('Twilio is not configured')
+  const sid = clean(env('TWILIO_ACCOUNT_SID'))
+  if (!sid || !env('TWILIO_AUTH_TOKEN') || (!env('TWILIO_FROM') && !env('TWILIO_MESSAGING_SERVICE_SID')))
+    throw new Error('Twilio is not configured')
   const phone = toE164(to)
   if (!phone) throw new Error(`Invalid phone number: ${to}`)
   const form = new URLSearchParams({ To: phone, Body: body })
-  if (svc) form.set('MessagingServiceSid', svc)
-  else form.set('From', from)
+  const sender = await twilioSender()
+  form.set(sender.key, sender.value)
   const r = await fetch(`https://api.twilio.com/2010-04-01/Accounts/${sid}/Messages.json`, {
     method: 'POST',
-    headers: { Authorization: `Basic ${btoa(`${sid}:${token}`)}`, 'Content-Type': 'application/x-www-form-urlencoded' },
+    headers: { Authorization: twilioAuth(), 'Content-Type': 'application/x-www-form-urlencoded' },
     body: form,
   })
   const j = await r.json().catch(() => ({}))
