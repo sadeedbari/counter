@@ -303,3 +303,6 @@ textarea { resize: vertical; }
   .phase-row select { grid-column: 2; grid-row: 2; }
   .phase-row .row-actions { grid-column: 3; grid-row: 1 / span 2; flex-direction: column; }
 }
+
+.cust-main .cust-visit { font-size: 0.8rem; margin-top: 1px; }
+.cust-since { color: var(--muted); font-size: 0.82rem; padding: 4px 0 8px; }

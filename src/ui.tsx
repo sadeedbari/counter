@@ -110,6 +110,11 @@ export function Field({
   )
 }
 
+/** Full date and time, e.g. "Oct 17, 2026, 1:39 AM". */
+export function exact(iso: string) {
+  return new Date(iso).toLocaleString([], { year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+}
+
 export function when(iso: string) {
   const d = new Date(iso)
   const mins = Math.round((Date.now() - d.getTime()) / 60_000)

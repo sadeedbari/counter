@@ -5,7 +5,9 @@ import { addEmployee, removeEmployee, resetDemo, setStatus, updateSettings, useS
 import { supabase } from './supabase'
 import { Workflow } from './Workflow'
 import type { Job } from './types'
-import { Avatar, Icon, StatusPill, phaseColor, useWide, when } from './ui'
+import { Avatar, Icon, StatusPill, exact, phaseColor, useWide, when } from './ui'
+
+const lastVisit = (js: Job[]) => js.reduce((a, j) => (j.intakeAt > a ? j.intakeAt : a), js[0].intakeAt)
 
 const spring = { type: 'spring', bounce: 0, duration: 0.4 } as const
 
@@ -174,6 +176,9 @@ export function Customers({ onOpen }: { onOpen: (id: string) => void }) {
               <div className="cust-main">
                 <b>{c.name}</b>
                 <span>{[c.phone, c.email].filter(Boolean).join('  ·  ')}</span>
+                <span className="cust-visit">
+                  {js.length ? `Last visit ${exact(lastVisit(js))}` : 'No visits yet'}
+                </span>
               </div>
               <span className="count">{js.length} {js.length === 1 ? 'visit' : 'visits'}</span>
               <motion.span animate={{ rotate: open === c.id ? 90 : 0 }} transition={spring} className="chev"><Icon name="chev" /></motion.span>
@@ -185,10 +190,11 @@ export function Customers({ onOpen }: { onOpen: (id: string) => void }) {
                   initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }}
                   transition={spring}
                 >
+                  <li className="cust-since">Customer since {exact(c.createdAt)}</li>
                   {js.map((j) => (
                     <li key={j.id}>
                       <button onClick={() => onOpen(j.id)}>
-                        <span>{j.item}<small>{when(j.intakeAt)}</small></span>
+                        <span>{j.item}<small>Checked in {exact(j.intakeAt)}</small></span>
                         <StatusPill status={j.status} />
                       </button>
                     </li>

@@ -2,7 +2,7 @@ import { motion } from 'motion/react'
 import { useEffect, useState } from 'react'
 import { sendMessages, setAssignee, setNotes, setNotify, setStatus, useStore } from './store'
 import { DeliveryTag } from './pages'
-import { Field, Icon, Switch, phaseColor, when } from './ui'
+import { Field, Icon, Switch, exact, phaseColor, when } from './ui'
 
 export function JobSheet({ jobId, onClose }: { jobId: string; onClose: () => void }) {
   const { jobs, customers, settings, messages } = useStore()
@@ -56,7 +56,7 @@ export function JobSheet({ jobId, onClose }: { jobId: string; onClose: () => voi
         </Field>
 
         <div className="card-group">
-          <div className="kv"><span>Checked in</span><b>{when(job.intakeAt)}</b></div>
+          <div className="kv"><span>Checked in</span><b>{exact(job.intakeAt)}</b></div>
           <div className="kv"><span>Phone</span><b>{customer.phone || 'None'}</b></div>
           <div className="kv"><span>Email</span><b>{customer.email || 'None'}</b></div>
         </div>
