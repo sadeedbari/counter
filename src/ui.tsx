@@ -1,7 +1,6 @@
 import { AnimatePresence, motion, useDragControls } from 'motion/react'
 import { useEffect, useState, type ReactNode } from 'react'
-import type { Status } from './types'
-import { STATUSES } from './types'
+import { useStore } from './store'
 
 export function useWide() {
   const q = '(min-width: 900px)'
@@ -63,12 +62,15 @@ export function Sheet({
   )
 }
 
-export function StatusPill({ status }: { status: Status }) {
-  const s = STATUSES.find((x) => x.id === status)!
+export const phaseColor = (c: string) => ({ '--c': `var(--c-${c})` }) as React.CSSProperties
+
+export function StatusPill({ status }: { status: string }) {
+  const { settings } = useStore()
+  const p = settings.phases.find((x) => x.id === status) ?? settings.phases[0]
   return (
-    <span className={`pill s-${status}`}>
+    <span className="pill" style={phaseColor(p.color)}>
       <i />
-      {s.label}
+      {p.name}
     </span>
   )
 }

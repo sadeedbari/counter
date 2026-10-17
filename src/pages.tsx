@@ -3,8 +3,9 @@ import { useMemo, useState } from 'react'
 import { VARIABLES, render } from './notify'
 import { addEmployee, removeEmployee, resetDemo, setStatus, updateSettings, useStore } from './store'
 import { supabase } from './supabase'
-import { STATUSES, type Job } from './types'
-import { Avatar, Icon, StatusPill, when } from './ui'
+import { Workflow } from './Workflow'
+import type { Job } from './types'
+import { Avatar, Icon, StatusPill, phaseColor, useWide, when } from './ui'
 
 const spring = { type: 'spring', bounce: 0, duration: 0.4 } as const
 
@@ -12,9 +13,12 @@ const spring = { type: 'spring', bounce: 0, duration: 0.4 } as const
 
 export function Board({ onOpen }: { onOpen: (id: string) => void }) {
   const { jobs, customers, settings } = useStore()
+  const { phases } = settings
+  const wide = useWide()
   const [q, setQ] = useState('')
   const [who, setWho] = useState('')
   const [showAllClosed, setShowAllClosed] = useState(false)
+  const [tab, setTab] = useState(phases[0]?.id)
 
   const cust = (id: string) => customers.find((c) => c.id === id)!
   const filtered = useMemo(() => {
@@ -27,9 +31,13 @@ export function Board({ onOpen }: { onOpen: (id: string) => void }) {
     })
   }, [jobs, customers, q, who]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  const closedIds = new Set(phases.filter((p) => p.kind === 'closed').map((p) => p.id))
+  const openCount = jobs.filter((j) => !closedIds.has(j.status)).length
+  const shown = wide ? phases : phases.filter((p) => p.id === (phases.some((x) => x.id === tab) ? tab : phases[0].id))
+
   return (
     <>
-      <PageHead title="Workshop" sub={`${jobs.filter((j) => j.status !== 'closed').length} open jobs`}>
+      <PageHead title="Workshop" sub={`${openCount} open ${openCount === 1 ? 'job' : 'jobs'}`}>
         <Search value={q} onChange={setQ} placeholder="Search name, item, phone" />
         <select className="select-pill" value={who} onChange={(e) => setWho(e.target.value)} aria-label="Filter by employee">
           <option value="">Everyone</option>
@@ -38,15 +46,32 @@ export function Board({ onOpen }: { onOpen: (id: string) => void }) {
         </select>
       </PageHead>
 
+      {!wide && (
+        <div className="phase-tabs" role="tablist" aria-label="Phase">
+          {phases.map((p) => {
+            const n = filtered.filter((j) => j.status === p.id).length
+            const on = p.id === (phases.some((x) => x.id === tab) ? tab : phases[0].id)
+            return (
+              <button key={p.id} role="tab" aria-selected={on} className={on ? 'on' : ''} style={phaseColor(p.color)} onClick={() => setTab(p.id)}>
+                <i /> {p.name} <span>{n}</span>
+              </button>
+            )
+          })}
+        </div>
+      )}
+
       <div className="board">
-        {STATUSES.map((s) => {
+        {shown.map((s) => {
           const all = filtered.filter((j) => j.status === s.id).sort((a, b) => +new Date(b.updatedAt) - +new Date(a.updatedAt))
-          const items = s.id === 'closed' && !showAllClosed ? all.slice(0, 5) : all
+          const capped = s.kind === 'closed' && !showAllClosed
+          const items = capped ? all.slice(0, 5) : all
           return (
-            <section key={s.id} className="col" aria-label={s.label}>
-              <h2 className={`col-head s-${s.id}`}>
-                <i /> {s.label} <span>{all.length}</span>
-              </h2>
+            <section key={s.id} className="col" aria-label={s.name}>
+              {wide && (
+                <h2 className="col-head" style={phaseColor(s.color)}>
+                  <i /> {s.name} <span>{all.length}</span>
+                </h2>
+              )}
               <div className="col-list">
                 <AnimatePresence initial={false} mode="popLayout">
                   {items.map((j) => (
@@ -54,7 +79,7 @@ export function Board({ onOpen }: { onOpen: (id: string) => void }) {
                   ))}
                 </AnimatePresence>
                 {all.length === 0 && <p className="empty-col">Nothing here</p>}
-                {s.id === 'closed' && all.length > 5 && (
+                {s.kind === 'closed' && all.length > 5 && (
                   <button className="link" onClick={() => setShowAllClosed((v) => !v)}>
                     {showAllClosed ? 'Show fewer' : `Show all ${all.length}`}
                   </button>
@@ -71,8 +96,8 @@ export function Board({ onOpen }: { onOpen: (id: string) => void }) {
 function JobCard({ job, onOpen }: { job: Job; onOpen: (id: string) => void }) {
   const { customers, settings } = useStore()
   const c = customers.find((x) => x.id === job.customerId)!
-  const idx = STATUSES.findIndex((s) => s.id === job.status)
-  const next = STATUSES[idx + 1]
+  const idx = settings.phases.findIndex((s) => s.id === job.status)
+  const next = settings.phases[idx + 1]
   const who = settings.employees.find((e) => e.id === job.assigneeId)
 
   return (
@@ -103,7 +128,7 @@ function JobCard({ job, onOpen }: { job: Job; onOpen: (id: string) => void }) {
           className="advance"
           onClick={(e) => { e.stopPropagation(); setStatus(job.id, next.id) }}
         >
-          {next.label} <Icon name="chev" />
+          {next.name} <Icon name="chev" />
         </button>
       )}
     </motion.article>
@@ -113,22 +138,23 @@ function JobCard({ job, onOpen }: { job: Job; onOpen: (id: string) => void }) {
 /* ───────────────────────── Customers ───────────────────────── */
 
 export function Customers({ onOpen }: { onOpen: (id: string) => void }) {
-  const { customers, jobs } = useStore()
+  const { customers, jobs, settings } = useStore()
   const [q, setQ] = useState('')
   const [open, setOpen] = useState<string | null>(null)
   const [onlyOpen, setOnlyOpen] = useState(false)
 
+  const closedSet = useMemo(() => new Set(settings.phases.filter((p) => p.kind === 'closed').map((p) => p.id)), [settings.phases])
   const rows = useMemo(() => {
     const needle = q.trim().toLowerCase()
     return customers
       .map((c) => ({ c, js: jobs.filter((j) => j.customerId === c.id) }))
       .filter(({ c, js }) => {
-        if (onlyOpen && !js.some((j) => j.status !== 'closed')) return false
+        if (onlyOpen && !js.some((j) => !closedSet.has(j.status))) return false
         if (!needle) return true
         return [c.name, c.email, c.phone, ...js.map((j) => j.item)].some((t) => t.toLowerCase().includes(needle))
       })
       .sort((a, b) => +new Date(b.js[0]?.intakeAt ?? b.c.createdAt) - +new Date(a.js[0]?.intakeAt ?? a.c.createdAt))
-  }, [customers, jobs, q, onlyOpen])
+  }, [customers, jobs, q, onlyOpen, closedSet])
 
   return (
     <>
@@ -243,6 +269,8 @@ export function SettingsPage() {
           <Preview text={s.closedMessage} job={sampleJob} cust={sampleCust} />
           <p className="vars">You can use {VARIABLES.map((v) => <code key={v}>{v}</code>)}</p>
         </section>
+
+        <Workflow />
 
         <section className="card">
           <h3>Team</h3>

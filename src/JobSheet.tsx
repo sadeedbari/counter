@@ -1,9 +1,8 @@
 import { motion } from 'motion/react'
 import { useEffect, useState } from 'react'
 import { sendMessages, setAssignee, setNotes, setNotify, setStatus, useStore } from './store'
-import { STATUSES } from './types'
 import { DeliveryTag } from './pages'
-import { Field, Icon, Switch, when } from './ui'
+import { Field, Icon, Switch, phaseColor, when } from './ui'
 
 export function JobSheet({ jobId, onClose }: { jobId: string; onClose: () => void }) {
   const { jobs, customers, settings, messages } = useStore()
@@ -14,7 +13,9 @@ export function JobSheet({ jobId, onClose }: { jobId: string; onClose: () => voi
   if (!job || !customer) return null
 
   const sent = messages.filter((m) => m.jobId === job.id)
-  const resendKind = job.status === 'ready' ? 'ready' : job.status === 'closed' ? 'closed' : null
+  const phases = settings.phases
+  const kind = (phases.find((p) => p.id === job.status) ?? phases[0]).kind
+  const resendKind = kind === 'active' ? null : kind
 
   return (
     <div className="sheet-body">
@@ -30,7 +31,7 @@ export function JobSheet({ jobId, onClose }: { jobId: string; onClose: () => voi
         {job.photo && <img className="job-photo" src={job.photo} alt={job.item} />}
 
         <div className="segmented" role="radiogroup" aria-label="Status">
-          {STATUSES.map((s) => (
+          {phases.map((s) => (
             <button
               key={s.id} role="radio" aria-checked={job.status === s.id}
               className={job.status === s.id ? 'on' : ''}
@@ -38,11 +39,11 @@ export function JobSheet({ jobId, onClose }: { jobId: string; onClose: () => voi
             >
               {job.status === s.id && (
                 <motion.i
-                  layoutId="seg" className={`seg-thumb s-${s.id}`}
+                  layoutId="seg" className="seg-thumb" style={phaseColor(s.color)}
                   transition={{ type: 'spring', bounce: 0.1, duration: 0.4 }}
                 />
               )}
-              <span>{s.label}</span>
+              <span>{s.name}</span>
             </button>
           ))}
         </div>

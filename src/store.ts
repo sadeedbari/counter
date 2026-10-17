@@ -1,8 +1,8 @@
 import { useSyncExternalStore } from 'react'
 import { buildMessages } from './notify'
 import { supabase } from './supabase'
-import type { Customer, Employee, Job, JobEvent, Message, Settings, State, Status } from './types'
-import { STATUSES } from './types'
+import type { Customer, Employee, Job, JobEvent, Message, Phase, Settings, State } from './types'
+import { DEFAULT_PHASES } from './types'
 
 const KEY = 'counter.v1'
 const id = () => crypto.randomUUID()
@@ -21,6 +21,7 @@ const defaultSettings: Settings = {
     { id: 'e2', name: 'Jordan' },
     { id: 'e3', name: 'Sam' },
   ],
+  phases: DEFAULT_PHASES,
 }
 
 function seed(): State {
@@ -34,7 +35,7 @@ function seed(): State {
     c('Tom Whitaker', 'tom@example.com', '', 45),
   ]
   const j = (
-    i: number, item: string, status: Status, assigneeId: string | undefined, m: number, notes = '',
+    i: number, item: string, status: string, assigneeId: string | undefined, m: number, notes = '',
   ): Job => ({
     id: id(), customerId: customers[i].id, item, notes, status, assigneeId, notify: true,
     intakeAt: ago(m), updatedAt: ago(Math.max(5, m / 3)),
@@ -57,7 +58,12 @@ function load(): State {
   if (remote) return { customers: [], jobs: [], messages: [], settings: defaultSettings, phase: 'loading' }
   try {
     const raw = localStorage.getItem(KEY)
-    if (raw) return JSON.parse(raw) as State
+    if (raw) {
+      const saved = JSON.parse(raw) as State
+      // Older saves predate custom phases.
+      if (!saved.settings.phases?.length) saved.settings.phases = DEFAULT_PHASES
+      return saved
+    }
   } catch {}
   return seed()
 }
@@ -85,7 +91,7 @@ export function useStore(): State {
 }
 
 const event = (text: string): JobEvent => ({ at: new Date().toISOString(), text })
-const label = (s: Status) => STATUSES.find((x) => x.id === s)!.label
+const phaseOf = (id: string) => state.settings.phases.find((p) => p.id === id)
 const norm = (p: string) => p.replace(/\D/g, '')
 
 /** Store phones in one shape so the same person always matches: +1XXXXXXXXXX for 10/11-digit numbers. */
@@ -133,8 +139,9 @@ const list = async <T,>(q: PromiseLike<{ data: T[] | null; error: { message: str
 export async function refresh() {
   if (!remote) return
   try {
-    const [st, members, customers, jobs, events, messages] = await Promise.all([
+    const [st, phases, members, customers, jobs, events, messages] = await Promise.all([
       must(remote.from('stores').select('*').maybeSingle()),
+      list(remote.from('phases').select('id,name,color,kind,position').order('position')),
       list(remote.from('members').select('id,name,user_id').order('name')),
       list(remote.from('customers').select('*').order('created_at', { ascending: false })),
       list(remote.from('jobs').select('*').order('intake_at', { ascending: false })),
@@ -166,6 +173,7 @@ export async function refresh() {
         closedMessage: st.closed_message,
         reviewLink: st.review_link,
         employees: members.map((m): Employee => ({ id: m.id, name: m.name, isLogin: !!m.user_id })),
+        phases: phases.map((p): Phase => ({ id: p.id, name: p.name, color: p.color, kind: p.kind })),
       },
       customers: customers.map((c): Customer => ({
         id: c.id, name: c.name, email: c.email ?? '', phone: c.phone ?? '', createdAt: c.created_at,
@@ -173,7 +181,7 @@ export async function refresh() {
       jobs: jobs.map((j): Job => ({
         id: j.id, customerId: j.customer_id, item: j.item, notes: j.notes,
         photo: j.photo_path ? photoUrls.get(j.photo_path) : undefined,
-        status: j.status, assigneeId: j.assignee_id ?? undefined, notify: j.notify,
+        status: j.phase_id, assigneeId: j.assignee_id ?? undefined, notify: j.notify,
         intakeAt: j.intake_at, updatedAt: j.updated_at, events: evByJob.get(j.id) ?? [],
       })),
       messages: messages.map((m): Message => ({
@@ -245,7 +253,7 @@ export function createJob(input: IntakeInput): Job {
   const customer: Customer = existing ?? { id: id(), name: input.name.trim(), email, phone, createdAt: now }
   const job: Job = {
     id: id(), customerId: customer.id, item: input.item.trim(), notes: input.notes.trim(),
-    photo: input.photo, status: 'new', assigneeId: input.assigneeId, notify: input.notify,
+    photo: input.photo, status: state.settings.phases[0].id, assigneeId: input.assigneeId, notify: input.notify,
     intakeAt: now, updatedAt: now, events: [{ at: now, text: 'Checked in' }],
   }
   commit({
@@ -271,7 +279,7 @@ export function createJob(input: IntakeInput): Job {
       }
       await must(remote.from('jobs').insert({
         id: job.id, store_id: sid, customer_id: customer.id, item: job.item, notes: job.notes,
-        photo_path, assignee_id: job.assigneeId ?? null, notify: job.notify,
+        photo_path, phase_id: job.status, assignee_id: job.assigneeId ?? null, notify: job.notify,
       }))
       await must(remote.from('job_events').insert({ job_id: job.id, text: 'Checked in' }))
       await refresh()
@@ -280,25 +288,27 @@ export function createJob(input: IntakeInput): Job {
   return job
 }
 
-export function setStatus(jobId: string, status: Status) {
+export function setStatus(jobId: string, status: string) {
   const job = state.jobs.find((j) => j.id === jobId)
   if (!job || job.status === status) return
+  const phase = phaseOf(status)
+  if (!phase) return
   patchJob(jobId, (j) => ({
-    ...j, status, events: [...j.events, event(`Moved to ${label(status)}`)],
+    ...j, status, events: [...j.events, event(`Moved to ${phase.name}`)],
   }))
 
   if (remote) {
     // The database queues the customer message when the status changes; the Edge Function delivers it.
     void (async () => {
-      await must(remote.from('jobs').update({ status }).eq('id', jobId))
-      await must(remote.from('job_events').insert({ job_id: jobId, text: `Moved to ${label(status)}` }))
+      await must(remote.from('jobs').update({ phase_id: status }).eq('id', jobId))
+      await must(remote.from('job_events').insert({ job_id: jobId, text: `Moved to ${phase.name}` }))
       await refresh()
       followUp()
     })().catch(fail)
     return
   }
 
-  const kind = status === 'ready' ? 'ready' : status === 'closed' ? 'closed' : null
+  const kind = phase.kind === 'active' ? null : phase.kind
   if (!kind || !job.notify) return
   // Don't re-text a customer if a job bounces back and forth. Use "Resend" instead.
   if (state.messages.some((m) => m.jobId === jobId && m.kind === kind)) return
@@ -358,7 +368,7 @@ export function setNotes(jobId: string, notes: string) {
 let settingsTimer: ReturnType<typeof setTimeout> | undefined
 let pendingSettings: Partial<Settings> = {}
 
-export function updateSettings(patch: Partial<Omit<Settings, 'employees'>>) {
+export function updateSettings(patch: Partial<Omit<Settings, 'employees' | 'phases'>>) {
   commit({ ...state, settings: { ...state.settings, ...patch } })
   if (!remote || !storeId) return
   pendingSettings = { ...pendingSettings, ...patch }
@@ -374,6 +384,28 @@ export function updateSettings(patch: Partial<Omit<Settings, 'employees'>>) {
       ...(p.reviewLink !== undefined && { review_link: p.reviewLink }),
     }).eq('id', storeId!)).catch(fail)
   }, 700)
+}
+
+/** Replace the shop's workflow. Jobs in removed phases move to the phase now at the same position. */
+export async function setPhases(next: Phase[]): Promise<string | null> {
+  const clean = next.map((p) => ({ ...p, name: p.name.trim() }))
+  if (clean.length < 1 || clean.length > 10) return 'Use between 1 and 10 phases'
+  if (clean.some((p) => !p.name)) return 'Every phase needs a name'
+  if (remote) {
+    const { error } = await remote.rpc('set_phases', { p_phases: clean })
+    if (error) return error.message
+    await refresh()
+    return null
+  }
+  const old = state.settings.phases
+  const keep = new Set(clean.map((p) => p.id))
+  const jobs = state.jobs.map((j) => {
+    if (keep.has(j.status)) return j
+    const at = Math.max(0, old.findIndex((p) => p.id === j.status))
+    return { ...j, status: clean[Math.min(at, clean.length - 1)].id }
+  })
+  commit({ ...state, jobs, settings: { ...state.settings, phases: clean } })
+  return null
 }
 
 export function addEmployee(name: string) {

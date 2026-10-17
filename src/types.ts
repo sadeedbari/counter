@@ -1,11 +1,51 @@
-export type Status = 'new' | 'in_progress' | 'complete' | 'ready' | 'closed'
+export const PHASE_COLORS = ['blue', 'indigo', 'purple', 'pink', 'red', 'orange', 'yellow', 'green', 'teal', 'gray'] as const
+export type PhaseColor = (typeof PHASE_COLORS)[number]
 
-export const STATUSES: { id: Status; label: string }[] = [
-  { id: 'new', label: 'New' },
-  { id: 'in_progress', label: 'In Progress' },
-  { id: 'complete', label: 'Complete' },
-  { id: 'ready', label: 'Ready for Pickup' },
-  { id: 'closed', label: 'Closed' },
+/** What happens when a job reaches the phase: nothing, the pickup message, or the thank-you (finished). */
+export type PhaseKind = 'active' | 'ready' | 'closed'
+
+export interface Phase {
+  id: string
+  name: string
+  color: PhaseColor
+  kind: PhaseKind
+}
+
+export const DEFAULT_PHASES: Phase[] = [
+  { id: 'new', name: 'New', color: 'blue', kind: 'active' },
+  { id: 'in_progress', name: 'In Progress', color: 'orange', kind: 'active' },
+  { id: 'complete', name: 'Complete', color: 'teal', kind: 'active' },
+  { id: 'ready', name: 'Ready for Pickup', color: 'green', kind: 'ready' },
+  { id: 'closed', name: 'Closed', color: 'gray', kind: 'closed' },
+]
+
+type PhaseDraft = Omit<Phase, 'id'>
+export const TEMPLATES: { id: string; label: string; blurb: string; phases: PhaseDraft[] }[] = [
+  {
+    id: 'repair', label: 'Repair shop', blurb: '5 phases',
+    phases: DEFAULT_PHASES.map(({ id: _id, ...p }) => p),
+  },
+  {
+    id: 'quick', label: 'Quick service', blurb: '4 phases',
+    phases: [
+      { name: 'Checked In', color: 'blue', kind: 'active' },
+      { name: 'In Progress', color: 'orange', kind: 'active' },
+      { name: 'Ready for Pickup', color: 'green', kind: 'ready' },
+      { name: 'Picked Up', color: 'gray', kind: 'closed' },
+    ],
+  },
+  {
+    id: 'quotes', label: 'Quotes and parts', blurb: '7 phases',
+    phases: [
+      { name: 'New', color: 'blue', kind: 'active' },
+      { name: 'Awaiting Approval', color: 'purple', kind: 'active' },
+      { name: 'Waiting on Parts', color: 'yellow', kind: 'active' },
+      { name: 'In Progress', color: 'orange', kind: 'active' },
+      { name: 'Complete', color: 'teal', kind: 'active' },
+      { name: 'Ready for Pickup', color: 'green', kind: 'ready' },
+      { name: 'Closed', color: 'gray', kind: 'closed' },
+    ],
+  },
 ]
 
 export interface Customer {
@@ -27,7 +67,8 @@ export interface Job {
   item: string
   notes: string
   photo?: string
-  status: Status
+  /** Id of the phase the job is in. */
+  status: string
   assigneeId?: string
   notify: boolean
   intakeAt: string
@@ -63,6 +104,7 @@ export interface Settings {
   closedMessage: string
   reviewLink: string
   employees: Employee[]
+  phases: Phase[]
 }
 
 export interface State {
