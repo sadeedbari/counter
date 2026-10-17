@@ -1,7 +1,8 @@
 import { AnimatePresence, motion } from 'motion/react'
 import { useMemo, useState } from 'react'
 import { VARIABLES, render } from './notify'
-import { resetDemo, setStatus, updateSettings, useStore } from './store'
+import { addEmployee, removeEmployee, resetDemo, setStatus, updateSettings, useStore } from './store'
+import { supabase } from './supabase'
 import { STATUSES, type Job } from './types'
 import { Avatar, Icon, StatusPill, when } from './ui'
 
@@ -183,18 +184,21 @@ export function Messages() {
   return (
     <>
       <PageHead title="Messages" sub="Everything sent to customers" />
-      <p className="banner">
-        Demo mode: messages are recorded here instead of being delivered. Connect Resend (email) and Twilio (text) to send them for real.
-      </p>
+      {!supabase && (
+        <p className="banner">
+          Demo mode: messages are recorded here instead of being delivered. Connect Resend (email) and Twilio (text) to send them for real.
+        </p>
+      )}
       <div className="list-card">
         {messages.length === 0 && <p className="empty-col pad">Nothing sent yet. Move a job to Ready for Pickup to see one.</p>}
         {messages.map((m) => (
           <div key={m.id} className="msg">
             <span className={`msg-ico ${m.channel}`}><Icon name={m.channel === 'sms' ? 'sms' : 'mail'} /></span>
             <div>
-              <b>{customers.find((c) => c.id === m.customerId)?.name} <small>{m.to}</small></b>
+              <b>{customers.find((c) => c.id === m.customerId)?.name} <small>{m.to}</small> <DeliveryTag m={m} /></b>
               {m.subject && <em>{m.subject}</em>}
               <p>{m.body}</p>
+              {m.status === 'failed' && m.error && <p className="fail-note">{m.error}</p>}
             </div>
             <time>{when(m.at)}</time>
           </div>
@@ -246,7 +250,7 @@ export function SettingsPage() {
             {s.employees.map((e) => (
               <li key={e.id}>
                 <Avatar name={e.name} /> <span>{e.name}</span>
-                <button className="link danger" onClick={() => updateSettings({ employees: s.employees.filter((x) => x.id !== e.id) })}>Remove</button>
+                {e.isLogin ? <small className="you">Signed-in user</small> : <button className="link danger" onClick={() => removeEmployee(e.id)}>Remove</button>}
               </li>
             ))}
           </ul>
@@ -255,7 +259,7 @@ export function SettingsPage() {
             onSubmit={(ev) => {
               ev.preventDefault()
               if (!name.trim()) return
-              updateSettings({ employees: [...s.employees, { id: crypto.randomUUID(), name: name.trim() }] })
+              addEmployee(name.trim())
               setName('')
             }}
           >
@@ -264,7 +268,7 @@ export function SettingsPage() {
           </form>
         </section>
 
-        <button className="link danger reset" onClick={() => confirm('Reset all demo data?') && resetDemo()}>Reset demo data</button>
+        {!supabase && <button className="link danger reset" onClick={() => confirm('Reset all demo data?') && resetDemo()}>Reset demo data</button>}
       </div>
     </>
   )
@@ -297,4 +301,10 @@ function Search({ value, onChange, placeholder }: { value: string; onChange: (v:
       <input type="search" value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} aria-label={placeholder} />
     </label>
   )
+}
+
+export function DeliveryTag({ m }: { m: { status?: string } }) {
+  if (!m.status) return null
+  const text = { queued: 'Queued', sending: 'Sending', sent: 'Delivered', failed: 'Failed' }[m.status] ?? m.status
+  return <span className={`dtag d-${m.status}`}>{text}</span>
 }

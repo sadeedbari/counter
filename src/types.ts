@@ -45,11 +45,16 @@ export interface Message {
   subject?: string
   body: string
   at: string
+  /** Delivery state. Only present when connected to the backend. */
+  status?: 'queued' | 'sending' | 'sent' | 'failed'
+  error?: string
 }
 
 export interface Employee {
   id: string
   name: string
+  /** A staff login. Can't be removed from the team list. */
+  isLogin?: boolean
 }
 
 export interface Settings {
@@ -65,4 +70,7 @@ export interface State {
   jobs: Job[]
   messages: Message[]
   settings: Settings
+  /** Backend connection state; absent in demo mode. */
+  phase?: 'loading' | 'ready' | 'no-store'
+  notice?: string
 }

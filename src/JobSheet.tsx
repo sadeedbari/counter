@@ -2,6 +2,7 @@ import { motion } from 'motion/react'
 import { useEffect, useState } from 'react'
 import { sendMessages, setAssignee, setNotes, setNotify, setStatus, useStore } from './store'
 import { STATUSES } from './types'
+import { DeliveryTag } from './pages'
 import { Field, Icon, Switch, when } from './ui'
 
 export function JobSheet({ jobId, onClose }: { jobId: string; onClose: () => void }) {
@@ -101,7 +102,7 @@ export function JobSheet({ jobId, onClose }: { jobId: string; onClose: () => voi
               {sent.map((m) => (
                 <li key={m.id}>
                   <Icon name={m.channel === 'sms' ? 'sms' : 'mail'} />
-                  <div><b>{m.to}</b><p>{m.body}</p></div>
+                  <div><b>{m.to}</b> <DeliveryTag m={m} /><p>{m.body}</p>{m.status === 'failed' && m.error && <p className="fail-note">{m.error}</p>}</div>
                 </li>
               ))}
             </ul>

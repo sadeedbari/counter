@@ -1,9 +1,11 @@
 import { MotionConfig } from 'motion/react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { Auth, Onboarding } from './Auth'
 import { IntakeSheet } from './IntakeSheet'
 import { JobSheet } from './JobSheet'
 import { Board, Customers, Messages, SettingsPage } from './pages'
-import { useStore } from './store'
+import { connect, dismissNotice, useStore } from './store'
+import { supabase, useSession } from './supabase'
 import { Icon, Sheet } from './ui'
 
 type Tab = 'board' | 'customers' | 'messages' | 'settings'
@@ -15,10 +17,24 @@ const TABS: { id: Tab; label: string; icon: 'board' | 'people' | 'chat' | 'gear'
 ]
 
 export default function App() {
+  const session = useSession()
+  const { phase } = useStore()
+
+  useEffect(() => (session ? connect() : undefined), [session?.user.id]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (session === undefined) return <div className="auth" aria-busy="true" />
+  if (supabase && !session) return <Auth />
+  if (supabase && phase === 'loading') return <div className="auth" aria-busy="true"><span className="logo big pulse">C</span></div>
+  if (supabase && phase === 'no-store')
+    return <Onboarding suggested={String(session?.user.user_metadata?.shop ?? '')} />
+  return <Shell />
+}
+
+function Shell() {
   const [tab, setTab] = useState<Tab>('board')
   const [jobId, setJobId] = useState<string | null>(null)
   const [intake, setIntake] = useState(false)
-  const { settings } = useStore()
+  const { settings, notice } = useStore()
 
   const sheet = intake ? 'intake' : jobId ? 'job' : null
 
@@ -35,6 +51,9 @@ export default function App() {
           <button className="btn primary new-btn" onClick={() => setIntake(true)}>
             <Icon name="plus" /><span>New check-in</span>
           </button>
+          {supabase && (
+            <button className="signout" onClick={() => supabase?.auth.signOut()}>Sign out</button>
+          )}
         </nav>
 
         <main>
@@ -43,6 +62,13 @@ export default function App() {
           {tab === 'messages' && <Messages />}
           {tab === 'settings' && <SettingsPage />}
         </main>
+
+        {notice && (
+          <div className="toast" role="alert">
+            <span>{notice}</span>
+            <button onClick={dismissNotice} aria-label="Dismiss">Dismiss</button>
+          </div>
+        )}
 
         <button className="fab" onClick={() => setIntake(true)} aria-label="New check-in"><Icon name="plus" /></button>
 
