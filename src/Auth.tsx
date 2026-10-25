@@ -1,10 +1,11 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { createShop } from './store'
 import { supabase } from './supabase'
 import { Field } from './ui'
 
-export function Auth() {
-  const [mode, setMode] = useState<'in' | 'up'>('in')
+export function Auth({ initial = 'in', onBack }: { initial?: 'in' | 'up'; onBack?: () => void }) {
+  const [mode, setMode] = useState<'in' | 'up'>(initial)
+  useEffect(() => setMode(initial), [initial])
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [shop, setShop] = useState('')
@@ -49,6 +50,7 @@ export function Auth() {
         <button type="button" className="link" onClick={() => { setMode(mode === 'in' ? 'up' : 'in'); setMsg(undefined) }}>
           {mode === 'in' ? 'New shop? Create an account' : 'Already have an account? Sign in'}
         </button>
+        {onBack && <button type="button" className="link muted-link" onClick={onBack}>← Back to home</button>}
       </form>
     </div>
   )

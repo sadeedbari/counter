@@ -1,6 +1,7 @@
 import { MotionConfig } from 'motion/react'
 import { useEffect, useState } from 'react'
 import { Auth, Onboarding } from './Auth'
+import Landing from './Landing'
 import { IntakeSheet } from './IntakeSheet'
 import { JobSheet } from './JobSheet'
 import { Board, Customers, Messages, SettingsPage } from './pages'
@@ -25,11 +26,30 @@ export default function App() {
   useEffect(() => (session ? connect() : undefined), [session?.user.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   if (session === undefined) return <div className="auth" aria-busy="true" />
-  if (supabase && !session) return <Auth />
+  if (supabase && !session) return <Entry />
   if (supabase && phase === 'loading') return <div className="auth" aria-busy="true"><span className="logo big pulse">C</span></div>
   if (supabase && phase === 'no-store')
     return <Onboarding suggested={String(session?.user.user_metadata?.shop ?? '')} />
   return <Shell />
+}
+
+const isInstalled = () =>
+  matchMedia('(display-mode: standalone)').matches || (navigator as { standalone?: boolean }).standalone === true
+
+/** Signed out: marketing page for visitors, straight to sign-in inside the installed app. */
+function Entry() {
+  const [hash, setHash] = useState(location.hash)
+  useEffect(() => {
+    const on = () => setHash(location.hash)
+    addEventListener('hashchange', on)
+    return () => removeEventListener('hashchange', on)
+  }, [])
+  const view = hash === '#signup' ? 'up' : hash === '#signin' ? 'in' : isInstalled() ? 'in' : null
+  useEffect(() => {
+    if (view) window.scrollTo(0, 0)
+  }, [view])
+  if (!view) return <Landing />
+  return <Auth initial={view} onBack={isInstalled() ? undefined : () => { location.hash = '' }} />
 }
 
 function Shell() {

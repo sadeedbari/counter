@@ -372,3 +372,4 @@ textarea { resize: vertical; }
   .swatch-pop { grid-template-columns: repeat(5, 34px); top: 42px; }
   .row-actions { gap: 2px; }
 }
+.muted-link { color: var(--muted); font-size: 0.9rem; justify-self: center; }
