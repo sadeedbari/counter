@@ -79,9 +79,6 @@ function Shell() {
           <button className="btn primary new-btn" onClick={() => setIntake(true)}>
             <Icon name="plus" /><span>New check-in</span>
           </button>
-          {supabase && (
-            <button className="signout" onClick={() => supabase?.auth.signOut()}>Sign out</button>
-          )}
         </nav>
 
         <main>

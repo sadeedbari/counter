@@ -2,7 +2,7 @@ import { AnimatePresence, motion } from 'motion/react'
 import { useMemo, useState } from 'react'
 import { VARIABLES, render } from './notify'
 import { addEmployee, removeEmployee, resetDemo, setStatus, updateSettings, useStore } from './store'
-import { supabase } from './supabase'
+import { supabase, useSession } from './supabase'
 import { InstallCard } from './Install'
 import { Workflow } from './Workflow'
 import type { Job } from './types'
@@ -245,6 +245,7 @@ export function Messages() {
 
 export function SettingsPage() {
   const { settings: s, jobs, customers } = useStore()
+  const session = useSession()
   const [name, setName] = useState('')
   const sampleJob = jobs[0]
   const sampleCust = sampleJob && customers.find((c) => c.id === sampleJob.customerId)
@@ -303,6 +304,14 @@ export function SettingsPage() {
             <button className="btn" type="submit">Add</button>
           </form>
         </section>
+
+        {supabase && (
+          <section className="card">
+            <h3>Account</h3>
+            {session?.user.email && <p className="muted">Signed in as {session.user.email}</p>}
+            <button className="btn" onClick={() => supabase?.auth.signOut()}>Sign out</button>
+          </section>
+        )}
 
         {!supabase && <button className="link danger reset" onClick={() => confirm('Reset all demo data?') && resetDemo()}>Reset demo data</button>}
       </div>
