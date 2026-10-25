@@ -211,7 +211,10 @@ export default function Landing() {
 
       <footer className="lp-foot">
         <span className="lp-brand"><span className="logo">C</span><b>Counter</b></span>
-        <span>© {new Date().getFullYear()} Counter</span>
+        <span className="lp-credit">
+          © {new Date().getFullYear()} Counter · Designed and built by{' '}
+          <a href="https://sulosystems.com" target="_blank" rel="noopener">sulosystems.com</a>
+        </span>
       </footer>
     </div>
   )
