@@ -1,5 +1,7 @@
-import { useEffect, useRef, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import './landing.css'
+
+const VIDEO = { id: 'LQRV3uDI21A', title: 'What is Counter?' }
 
 const go = (view: 'signin' | 'signup') => () => {
   location.hash = view
@@ -100,7 +102,17 @@ export default function Landing() {
             <a className="btn big ghost" href="#how">See how it works</a>
           </div>
 
-          <div className="lp-stage" aria-hidden="true">
+          <VideoPlayer />
+        </section>
+
+        {/* ── board at a glance ── */}
+        <section className="lp-section lp-glance">
+          <Reveal>
+            <p className="lp-eyebrow">The workshop board</p>
+            <h2>See every job at a glance.</h2>
+            <p className="lp-lede">Each job moves across your phases. Tap to open it, change its status, assign it, and see what the customer has been sent.</p>
+          </Reveal>
+          <Reveal><div className="lp-stage" aria-hidden="true">
             <div className="lp-window">
               <div className="lp-bar"><i /><i /><i /><span>Workshop</span></div>
               <div className="lp-cols">
@@ -120,7 +132,7 @@ export default function Landing() {
               <p className="lp-bubble">Hi Daniel, your Brompton folding bike is ready for pickup at Spoke &amp; Chain Cycles. See you soon!</p>
               <span className="lp-delivered">Delivered</span>
             </div>
-          </div>
+          </div></Reveal>
         </section>
 
         {/* ── how it works ── */}
@@ -238,6 +250,35 @@ function Card({ initials, who, item, meta, next }: { initials: string; who: stri
       </div>
       <small>{meta}</small>
       <span className="lp-adv">{next} ›</span>
+    </div>
+  )
+}
+
+/** Poster first; the YouTube player (privacy-enhanced domain) loads only when someone presses play. */
+function VideoPlayer() {
+  const [playing, setPlaying] = useState(false)
+  return (
+    <div className="lp-video">
+      {playing ? (
+        <iframe
+          src={`https://www.youtube-nocookie.com/embed/${VIDEO.id}?autoplay=1&rel=0&modestbranding=1&playsinline=1`}
+          title={VIDEO.title}
+          allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
+          allowFullScreen
+          referrerPolicy="strict-origin-when-cross-origin"
+        />
+      ) : (
+        <button className="lp-poster" onClick={() => setPlaying(true)} aria-label={`Play video: ${VIDEO.title}`}>
+          <span className="lp-poster-brand"><span className="logo">C</span>Counter</span>
+          <span className="lp-play" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="30" height="30" fill="currentColor"><path d="M8.5 5.6v12.8a.8.8 0 0 0 1.2.7l10.4-6.4a.8.8 0 0 0 0-1.4L9.7 4.9a.8.8 0 0 0-1.2.7z" /></svg>
+          </span>
+          <span className="lp-poster-text">
+            <small>Watch the overview</small>
+            <b>{VIDEO.title}</b>
+          </span>
+        </button>
+      )}
     </div>
   )
 }
